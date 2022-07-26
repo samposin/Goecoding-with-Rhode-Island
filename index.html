@@ -1,0 +1,157 @@
+<!DOCTYPE html> 
+<html>
+<head>
+    <meta charset='utf-8' />
+    <title>Goecoding with Rhode island layer</title>
+
+    <script src="https://api.tiles.mapbox.com/mapbox-gl-js/v2.9.2/mapbox-gl.js"></script>
+    <link
+    href="https://api.tiles.mapbox.com/mapbox-gl-js/v2.9.2/mapbox-gl.css"
+    rel="stylesheet"
+    />   
+
+<style>
+    body {
+        padding: 0;
+        margin: 0;
+        box-sizing: border-box;
+    }
+#map {position:absolute; top:0; bottom:0; width:100%;}
+#right-panel {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 300px;
+    font-size: 12px;
+    background-color: rgba(255, 255, 255, 0.9);
+    /* height: 90vh;
+    overflow-y: auto; */
+    z-index: 5;
+}
+#geocoder-container {
+    position: absolute;
+    top: 10%;
+    left: 50%;
+    /* transform: translateX(50%); */
+}
+</style>
+
+</head>
+    
+<body>
+
+    <!-- Load the `mapbox-gl-geocoder` plugin. -->
+<script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.0/mapbox-gl-geocoder.min.js"></script>
+<link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.0/mapbox-gl-geocoder.css" type="text/css">
+<!-- <script src="https://api.mapbox.com/mapbox.js/plugins/turf/v3.0.11/turf.min.js"></script> -->
+<script src="https://npmcdn.com/@turf/turf/turf.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script>
+
+
+<div id="right-panel">
+</div>
+<div id="geocoder-container"></div>
+<div id='map'>
+</div>
+
+<script>
+
+    // AccesToken
+mapboxgl.accessToken = 'pk.eyJ1Ijoic3VubnlzYW53YXIiLCJhIjoiY2wwNjV5N3kzMDQwbTNib2NhMnd6NGg2dCJ9.501q9aEzAkIe4RzQm-IzQg'; //'pk.eyJ1IjoibmluYW5vdW4iLCJhIjoiY2pjdHBoZGlzMnV4dDJxcGc5azJkbWRiYSJ9.o4dZRrdHcgVEKCveOXG1YQ';
+
+    // Configuration de la carte
+var map = new mapboxgl.Map({
+    container: 'map',
+    style: 'mapbox://styles/mapbox/streets-v11',
+	zoom: 9,
+    center: [-71.4355, 41.7038],
+});
+
+const geocoder = new MapboxGeocoder({
+accessToken: mapboxgl.accessToken,
+    marker: {
+    color: 'orange'
+    },
+    mapboxgl: mapboxgl
+});
+ 
+map.addControl(geocoder);
+
+
+
+geocoder.on('result', e => {
+    var { bbox, center } = e.result;
+    var query = 'https://api.mapbox.com/v4/sunnysanwar.5wazn616/tilequery/' + center + '.json?radius=5&limit=1&geometry=polygon&dedupe&access_token=pk.eyJ1Ijoic3VubnlzYW53YXIiLCJhIjoiY2wwNjV5N3kzMDQwbTNib2NhMnd6NGg2dCJ9.501q9aEzAkIe4RzQm-IzQg';
+    $.ajax({
+        method: 'GET',
+        url: query,
+        data: {},
+        dataType: 'json',
+    }).done(function (response) {
+        console.log(response, "res");
+        if(response.features.length === 0){
+            return;
+        }
+        var bounds = turf.bbox(response);
+            map.fitBounds(bounds, {
+                padding: 320
+            });
+            setTimeout(() => {
+                var features = map.queryRenderedFeatures({ layers: ['parcels'], filter: ["==", "LABEL", response.features[0].properties.LABEL] });
+
+                    var fe = {
+                        "type": "FeatureCollection",
+                        "features": features
+                    };
+                    var bounds = turf.bbox(fe);
+                    features.forEach((feature) => {
+                        var prop = feature.properties;
+                        if (response.features[0].properties.LABEL == prop.LABEL) {
+                            map.setFilter('selected-parcels', ['in', 'LABEL', response.features[0].properties.LABEL]);
+                        }
+                    });
+            }, 2000);
+    });
+})
+
+map.on('load', ()=>{
+
+    //set up data sources
+    map.addSource('data-parcels', {
+        'type': 'vector',
+        'url': 'mapbox://sunnysanwar.5wazn616'
+    });
+
+    map.addLayer({
+        'id': 'parcels',
+        'type': 'fill',
+        'source': 'data-parcels',
+        'source-layer': 'rhodeisland',
+        'paint': {
+            'fill-outline-color': 'rgba(199,24,54,0)',
+            'fill-color': '#807780',
+            'fill-opacity': 0.5,
+        },
+    });
+
+    map.addLayer({
+        'id': 'selected-parcels',
+        'type': 'fill',
+        'source': 'data-parcels',
+        'source-layer': 'rhodeisland',
+        'paint': {
+            'fill-outline-color': 'red',
+            'fill-color': 'red',
+            'fill-opacity': 0.5,
+        },
+        "filter": ["==", "LABEL", ""]
+    });
+
+    map.on('click', 'parcels', (e) => {
+        console.log(e, "parcels");
+    });
+});
+</script>
+
+</body>
+</html>
